@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# This updates the input and output dimensions
+# of the machine based on the length of the wlist files.
+
+if [[ "x$#" != "x3" ]]; then
+    echo "Usage: $0 <source wlist> <target wlist> <mach conf>"
+    exit 1
+fi
+
+SRC_WLIST=$1
+TGT_WLIST=$2
+MACH_FILE=$3
+
+N_SRC=`wc -l $SRC_WLIST | cut -d" " -f1`
+N_TGT=`wc -l $TGT_WLIST | cut -d" " -f1`
+
+# +1 for EOS
+let "N_TGT = $N_TGT + 1"
+
+#echo "Source wlist: $SRC_WLIST, length: $N_SRC"
+#echo "Target wlist: $TGT_WLIST, length (+1 for EOS): $N_TGT"
+
+INPUT_DIM=`grep ^DIM $MACH_FILE | head -1 | cut -d" " -f1`
+OUTPUT_DIM=`grep ^DIM $MACH_FILE | tail -1 | cut -d" " -f1`
+
+sed -i -e "s/^$INPUT_DIM[ \t]*=.*$/$INPUT_DIM = $N_SRC/" -e "s/^$OUTPUT_DIM[ \t]*=.*$/$OUTPUT_DIM = $N_TGT/" $MACH_FILE

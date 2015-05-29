@@ -1,0 +1,74 @@
+#!/bin/bash
+
+export LC_ALL=C
+
+# SRC is the raw text file containing source sentences
+# Ex: corpus_name.<src>-<tgt>.<lang>, foobar.fr-en.fr
+SRC=$1
+SRC_LANG=${SRC##*.}
+# TGT is the raw text file containing target sentences
+# Ex: foobar.fr-en.en (corpus foobar, from french to english, english file)
+TGT=$2
+TGT_LANG=${TGT##*.}
+
+# Corpus name, e.g. news-commentary-v9.fr-en
+CORPUS=`basename -s ".$SRC_LANG" $SRC`
+
+echo "Source file: $SRC, language: $SRC_LANG"
+echo "Source file: $TGT, language: $TGT_LANG"
+
+NB_LINES=`wc -l $SRC | cut -d " " -f1`
+
+if [[ ! -z "$3" ]]; then
+    NB_LINES=$3
+    echo "Using only first $NB_LINES lines of corpus."
+fi
+
+# Adjust the paths
+TOKENIZER=~/PhD/mosesdecoder/scripts/tokenizer/tokenizer.perl
+TEXT2BIN=text2bin
+
+# My own Python script which generates an extract table, e.g. <src1> <src2> ||| <tgt1> <tgt2> .. ||| 0-0
+GENEXTRACT=~/PhD/scripts/generate_extract_table
+EXTRACT2BIN=extract2bin
+NGRAMCOUNT=`which ngram-count`
+CLEANCORPUS=~/PhD/scripts/clean-corpus-n-frac.perl
+
+NUM_THREADS=`grep "^processor" /proc/cpuinfo | wc -l`
+if [ "$NUM_THREADS" -gt "8" ]; then
+    NUM_THREADS="8"
+fi
+echo "Number of threads to use: $NUM_THREADS"
+
+START=`date +%s`
+
+echo "Tokenizing files"
+OSRC="$CORPUS.tok.$SRC_LANG"
+OTGT="$CORPUS.tok.$TGT_LANG"
+head -n $NB_LINES "$SRC" | $TOKENIZER -l $SRC_LANG -threads "$NUM_THREADS" -time > "$OSRC"
+head -n $NB_LINES "$TGT" | $TOKENIZER -l $TGT_LANG -threads "$NUM_THREADS" -time > "$OTGT"
+
+echo "Pruning corpus to filter only 32 words phrases"
+$CLEANCORPUS "$CORPUS.tok" $SRC_LANG $TGT_LANG filtered 1 32 3
+
+# Overwrite OSRC and OTGT to point to filtered.* files produced by
+# clean-corpus-n-frac.perl
+OSRC="filtered.$SRC_LANG"
+OTGT="filtered.$TGT_LANG"
+
+echo "Writing out vocabulary"
+$NGRAMCOUNT -text "$OSRC" -write-vocab "$OSRC.vocab"
+$NGRAMCOUNT -text "$OTGT" -write-vocab "$OTGT.vocab"
+
+echo "Binarizing word representations"
+$TEXT2BIN "$OSRC.vocab" "$OSRC.binary" "$OSRC.wlist" "$OSRC.oov" < "$OSRC"
+$TEXT2BIN "$OTGT.vocab" "$OTGT.binary" "$OTGT.wlist" "$OTGT.oov" < "$OTGT"
+
+echo "Generating extract table"
+$GENEXTRACT "$OSRC" "$OTGT" > extract_table
+
+echo "Generating binary phrase table"
+$EXTRACT2BIN "$CORPUS.bph" "$OSRC.vocab" "$OSRC.wlist" "$OSRC.oov" "$OTGT.vocab" "$OTGT.wlist" "$OTGT.oov" < extract_table
+
+STOP=`date +%s`
+echo "Preprocessing took $((STOP-START)) seconds in total."
