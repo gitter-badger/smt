@@ -2,6 +2,8 @@
 
 export LC_ALL=C
 
+# Usage:
+# ./script SRC_file TGT_file <NB_LINES>
 # SRC is the raw text file containing source sentences
 # Ex: corpus_name.<src>-<tgt>.<lang>, foobar.fr-en.fr
 SRC=$1
@@ -25,14 +27,17 @@ if [[ ! -z "$3" ]]; then
 fi
 
 # Adjust the paths
-TOKENIZER=~/PhD/mosesdecoder/scripts/tokenizer/tokenizer.perl
-TEXT2BIN=text2bin
+MOSES=~/phd/mosesdecoder
 
 # My own Python script which generates an extract table, e.g. <src1> <src2> ||| <tgt1> <tgt2> .. ||| 0-0
-GENEXTRACT=~/PhD/scripts/generate_extract_table
-EXTRACT2BIN=extract2bin
-NGRAMCOUNT=`which ngram-count`
-CLEANCORPUS=~/PhD/scripts/clean-corpus-n-frac.perl
+# Enable it if it isn't in your PATH
+GENEXTRACT=generate_extract_table
+
+TEXT2BIN=text2bin 						# from CSLM
+EXTRACT2BIN=extract2bin 					# from CSLM
+NGRAMCOUNT=`which ngram-count` 					# from SRILM
+CLEANCORPUS=${MOSES}/scripts/training/clean-corpus-n.perl 	# from MOSES
+TOKENIZER=${MOSES}/scripts/tokenizer/tokenizer.perl 		# from MOSES
 
 NUM_THREADS=`grep "^processor" /proc/cpuinfo | wc -l`
 if [ "$NUM_THREADS" -gt "8" ]; then
@@ -49,7 +54,8 @@ head -n $NB_LINES "$SRC" | $TOKENIZER -l $SRC_LANG -threads "$NUM_THREADS" -time
 head -n $NB_LINES "$TGT" | $TOKENIZER -l $TGT_LANG -threads "$NUM_THREADS" -time > "$OTGT"
 
 echo "Pruning corpus to filter only 32 words phrases"
-$CLEANCORPUS "$CORPUS.tok" $SRC_LANG $TGT_LANG filtered 1 32 3
+# The latest script from moses tree uses -ratio parameter for fraction
+$CLEANCORPUS "$CORPUS.tok" $SRC_LANG $TGT_LANG filtered 1 32 -ratio 3
 
 # Overwrite OSRC and OTGT to point to filtered.* files produced by
 # clean-corpus-n-frac.perl
