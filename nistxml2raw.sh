@@ -2,7 +2,8 @@
 
 for INFILE in "$@"
 do
-    OUT=${INFILE%.xml}.txt
+    OUT=`basename $INFILE`
+    OUT=${OUT%.xml}.txt
     echo "$INFILE -> $OUT"
     sed -n "/^<seg id/s/^<seg id.*> \(.*\) <\/seg>.*$/\1/gp" < $INFILE > $OUT
 done
