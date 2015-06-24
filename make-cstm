@@ -1,0 +1,15 @@
+#!/bin/bash
+
+git clean -xdf
+make -j16 CSTM=1 CUDA=0
+
+for f in cslm_ngrams cslm_train cstm_train dumpEmbeddings nbest cstm_eval nn_train extract2bin mach_dump text2bin cslm_eval nn_info conv_wl_sort cslm_rescore; do
+  cp $f $f.cpu
+done
+
+make CSTM=1 clean
+make -j16 CSTM=1 CUDA=1
+
+for f in cslm_ngrams cslm_train cstm_train dumpEmbeddings nbest cstm_eval nn_train extract2bin mach_dump text2bin cslm_eval nn_info conv_wl_sort cslm_rescore; do
+  cp $f $f.gpu
+done
