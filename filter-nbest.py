@@ -56,7 +56,7 @@ if __name__ == "__main__":
         if l_words > lim or l_words == 0:
             n_removed_srcp += 1
             phrases[i] = None
-            del hypotheses[i]
+            hypotheses[i] = []
 
     print "Filtered out %d source phrases (%.4f%%)" % (n_removed_srcp,
             100*float(n_removed_srcp) / n_phrases)
@@ -67,24 +67,26 @@ if __name__ == "__main__":
 
     print "2nd pass from right to left"
     for sent_id, hypos in hypotheses.items():
-        for i, sent in enumerate(hypos):
-            sent_len = len(sent[0].rstrip().split(" "))
-            if sent_len > lim:
-                del hypos[i]
+        if hypos:
+            n_removed_hyp = 0
+            for i, sent in enumerate(hypos):
+                sent_len = len(sent[0].rstrip().split())
+                if sent_len > lim:
+                    hypos[i] = None
+                    n_removed_hyp += 1
 
-        if len(hypos) == 0:
-            n_removed_srcp += 1
-            # No sentences left for this hyp, remove it
-            del hypotheses[sent_id]
-            # Mark corresponding source phrase as None also
-            phrases[sent_id] = None
+            if len(hypos) == n_removed_hyp:
+                n_removed_srcp += 1
+                # No sentences left for this hyp, remove it
+                hypotheses[sent_id] = None
+                # Mark corresponding source phrase as None also
+                phrases[sent_id] = None
 
     print "Filtered out %d further source phrases" % n_removed_srcp
-    print "%d final hypotheses" % sum([len(k) for k in hypotheses.values()])
 
     # These should be equal
     final_phrases = [p for p in phrases if p]
-    assert(len(final_phrases) == len(hypotheses.keys()))
+    assert(len(final_phrases) == len([h for h in hypotheses.keys() if hypotheses[h]]))
 
     # Dump files
     f_src = open("%s.%d" % (src, lim), "wb")
@@ -96,13 +98,15 @@ if __name__ == "__main__":
     line_ctr = 0
 
     f_out = open_func(new_nbest_file, "wb")
-    print "Dumping nbest file..."
+    print "Dumping nbest file.."
     for sent_id in sorted(hypotheses.keys()):
-        nbest_lines = []
-        for s in hypotheses[sent_id]:
-            s.insert(0, str(line_ctr))
-            nbest_lines.append(NBEST_DELIM.join(s) + "\n")
-        line_ctr += 1
-        f_out.writelines(nbest_lines)
+        h = hypotheses[sent_id]
+        if h:
+            nbest_lines = []
+            for s in [x for x in h if x]:
+                s.insert(0, str(line_ctr))
+                nbest_lines.append(NBEST_DELIM.join(s) + "\n")
+            line_ctr += 1
+            f_out.writelines(nbest_lines)
 
     f_out.close()
